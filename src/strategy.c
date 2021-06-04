@@ -7,7 +7,6 @@
 #include "magic.h"
 #include "strategy.h"
 
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 #define ARR_SIZE(x) sizeof(x)/sizeof(x[0])
 
 typedef void (*mut_function)(Mutator*);
@@ -70,8 +69,6 @@ static void shrink(Mutator* m) {
 	/* Remove bytes */
 	memmove(m->input + offset, m->input + offset + remove, m->input_size - (offset + remove));
 	m->input_size -= remove;
-
-	//printf"[Shrinked off=%lu amnt=%lu]: %.*s\n", offset, remove, (unsigned int)m->input_size, m->input);
 }
 
 /*
@@ -99,8 +96,6 @@ static void expand(Mutator* m) {
 	/* Make space and fill it */
 	make_space(m, offset, expand);
 	memset(m->input + offset, (m->printable) ? ' ' : '\0', expand);
-
-	//printf"[Expanded off=%lu amnt=%lu]: %.*s\n", offset, expand, (unsigned int)m->input_size, m->input);
 }
 
 /* Flip a random bit in a single byte of the input */
@@ -112,8 +107,6 @@ static void bit(Mutator* m) {
 
 	offset = get_random_offset(m, 0);
 	m->input[offset] ^= (1 << rng_rand(&(m->rng), 0, 7));
-
-	//printf"[Bit flipped off=%lu]: %.*s\n", offset, (unsigned int)m->input_size, m->input);
 }
 
 /* Increase by 1 a random byte of the input */
@@ -125,8 +118,6 @@ static void inc_byte(Mutator* m) {
 
 	offset = get_random_offset(m, 0);
 	m->input[offset] += 1;
-
-	//printf"[Incremented off=%lu]: %.*s\n", offset, (unsigned int)m->input_size, m->input);
 }
 
 /* Decrease by 1 a random byte of the input */
@@ -138,8 +129,6 @@ static void dec_byte(Mutator* m) {
 
 	offset = get_random_offset(m, 0);
 	m->input[offset] -= 1;
-
-	//printf"[Decremented off=%lu]: %.*s\n", offset, (unsigned int)m->input_size, m->input);
 }
 
 /* Negate a random byte of the input */
@@ -151,8 +140,6 @@ static void neg_byte(Mutator* m) {
 
 	offset = get_random_offset(m, 0);
 	m->input[offset] = ~(m->input[offset]);
-
-	//printf"[Negated off=%lu]: %.*s\n", offset, (unsigned int)m->input_size, m->input);
 }
 
 /* Add or substract to a random offset, with a random integer size (u8 through u64) */
@@ -196,8 +183,6 @@ static void add_sub(Mutator* m) {
 			m->input[i] = (m->input[i] - 32) % 95 + 32;
 		}	
 	}
-
-	//printf"[add_sub] %.*s\n", (unsigned int)m->input_size, m->input);
 }
 
 /* Set a random amount of bytes at a random offset with a single byte */
@@ -217,8 +202,6 @@ static void set(Mutator* m) {
 		chr = rng_rand(&(m->rng), 0, 255);
 
 	memset(m->input + offset, chr, len);
-
-	//printf"[set off=%lu amnt=%lu] %.*s\n", offset, len, (unsigned int)m->input_size, m->input);
 }
 
 /* Swap two blocks of the input */
@@ -241,8 +224,6 @@ static void swap(Mutator* m) {
 	memcpy(m->input + src, tmp, len);
 
 	free(tmp);
-
-	//printf"[swapped %lu<->%lu (%lu)] %.*s\n", src, dst, len, (unsigned int)m->input_size, m->input);
 }
 
 /* Overwrite a random block of the input with another block */
@@ -257,8 +238,6 @@ static void copy(Mutator* m) {
 
 	len = rng_exp(&(m->rng), 1, umin(m->input_size - src, m->input_size - dst));
 	memmove(m->input + dst, m->input + src, len);
-
-	//printf"[Copied %lu=>%lu (%lu)] %.*s\n", src, dst, len, (unsigned int)m->input_size, m->input);
 }
 
 static void inter_splice(Mutator* m) {
@@ -314,8 +293,6 @@ static void insert_rand(Mutator* m) {
 		else
 			m->input[i] = ch[i % len];
 	}
-
-	//printf"[insert_rand off=%lu, amnt=%lu] %.*s\n", offset, len, (unsigned int)m->input_size, m->input);
 }
 
 /* Insert 1 or 2 random bytes, without making space for them */
@@ -340,8 +317,6 @@ static void overwrite_rand(Mutator* m) {
 	len = rng_rand(&(m->rng), 1, len);
 
 	memcpy(m->input + offset, ch, len);
-
-	//printf("[overwrite_rand off=%lu, amnt=%lu] %.*s\n", offset, len, (unsigned int)m->input_size, m->input);
 }
 
 /* Find a byte and repeat it multiple times by overwriting the data after */
@@ -355,8 +330,6 @@ static void byte_repeat_overwrite(Mutator* m) {
 	amount = rng_exp(&(m->rng), 1, m->input_size - offset) - 1;
 
 	memset(m->input + offset + 1, m->input[offset], amount);
-
-	//printf("[byte_repeat_overwrite off=%lu, amnt=%lu] %.*s\n", offset, amount, (unsigned int)m->input_size, m->input);
 }
 
 /* Find a byte and repeat it multiple times by making space */
@@ -372,8 +345,6 @@ static void byte_repeat_insert(Mutator* m) {
 
 	make_space(m, offset + 1, amount);
 	memset(m->input + offset + 1, m->input[offset], amount);
-
-	//printf("[byte_repeat_insert off=%lu, amnt=%lu] %.*s\n", offset, amount, (unsigned int)m->input_size, m->input);
 }
 
 static void magic_overwrite(Mutator* m) {
@@ -393,8 +364,6 @@ static void magic_overwrite(Mutator* m) {
 			m->input[i] = (m->input[i] - 32) % 95 + 32;
 		}
 	}
-
-	//printf("[magic_overwrite off=%lu, amnt=%lu] %.*s\n", offset, amount, (unsigned int)m->input_size, m->input);
 }
 
 static void magic_insert(Mutator* m) {
