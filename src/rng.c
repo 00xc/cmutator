@@ -16,8 +16,12 @@ u64 rng_rand(Rng* self, u64 min, u64 max) {
 
 	assert(min <= max);
 
-	if (min == max) return min;
-	if (max == U64_MAX) return rng_next(self);
+	if (min == max)
+		return min;
+
+	if (min == 0 && max == U64_MAX)
+		return rng_next(self);
+
 	return min + (rng_next(self) % (max - min + 1));
 }
 
@@ -28,5 +32,6 @@ u64 rng_exp(Rng* self, u64 min, u64 max) {
 
 	if (rng_rand(self, 0, 1) == 0)
 		return rng_rand(self, min, max);
+	
 	return rng_rand(self, min, rng_rand(self, min, max));
 }
