@@ -3,7 +3,6 @@ A basic input mutator, blatantly based on Brandon Falk's [basic_mutator](https:/
 
 ### TODO ###
 * Add coverage-guided fuzzing support.
-* Avoid allocation when using the `swap` strategy.
 
 ## Usage ##
 Compile as a static library with `make libcmutator.a` and compile with your application:

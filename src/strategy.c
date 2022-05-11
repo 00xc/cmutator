@@ -8,10 +8,20 @@
 #include "strategy.h"
 
 #define ARR_SIZE(x) sizeof(x)/sizeof(x[0])
+#define SWAP(a, b) do { a ^= b; b ^= a; a ^= b; } while (0)
 
+typedef unsigned char uchar;
 typedef void (*mut_function)(Mutator*);
 
-static inline unsigned char make_printable(unsigned char c) {
+static void block_swap(uchar* x, uchar* y, size_t len) {
+	size_t i;
+
+	for (i = 0; i < len; ++i) {
+		SWAP(x[i], y[i]);
+	}
+}
+
+static inline uchar make_printable(uchar c) {
 	return (c - 32) % 95 + 32;
 }
 
@@ -216,24 +226,31 @@ static void set(Mutator* m) {
 
 /* Swap two blocks of the input */
 static void swap(Mutator* m) {
-	size_t src, dst, len;
-	unsigned char* tmp;
+	size_t off1, off2, len;
 
 	if (m->input_size == 0)
 		return;
 
-	src = get_random_offset(m, 0);
-	dst = get_random_offset(m, 0);
-	len = rng_exp(&(m->rng), 1, umin(m->input_size - src, m->input_size - dst));
+	off1 = get_random_offset(m, 0);
+	off2 = get_random_offset(m, 0);
+	len = rng_exp(&(m->rng), 1, umin(m->input_size - off1, m->input_size - off2));
 
-	if ((tmp = malloc(len)) == NULL)
-		err(EXIT_FAILURE, "malloc");
-	
-	memcpy(tmp, m->input + dst, len);
-	memmove(m->input + dst, m->input + src, len);
-	memcpy(m->input + src, tmp, len);
+	/* Make off1 be the smaller one */
+	if (off2 < off1) {
+		SWAP(off1, off2);
+	}
 
-	free(tmp);
+	if (off1 < off2 && off1 + len >= off2) {
+		/* Block 1 overlaps into block 2 */
+		size_t overlap_len = off1 + len - off2;
+
+		memcpy(m->input + off2, m->input + off1, overlap_len);
+		off1 += overlap_len;
+		off2 += overlap_len;
+		len -= overlap_len;
+	}
+
+	block_swap(m->input + off1, m->input + off2, len);
 }
 
 /* Overwrite a random block of the input with another block */
@@ -293,7 +310,7 @@ static void insert_rand(Mutator* m) {
 
 	/* Length is random (1 or 2), and capped to max. remaining space */
 	offset = get_random_offset(m, 0);
-	len = rng_rand(&(m->rng), 1, 2);
+	len = rng_rand(rng, 1, 2);
 	len = umin(len, m->max_input_size - m->input_size);
 
 	/* Make space for the new bytes and copy them */
