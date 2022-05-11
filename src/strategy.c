@@ -244,7 +244,7 @@ static void swap(Mutator* m) {
 		/* Block 1 overlaps into block 2 */
 		size_t overlap_len = off1 + len - off2;
 
-		memcpy(m->input + off2, m->input + off1, overlap_len);
+		memmove(m->input + off2, m->input + off1, overlap_len);
 		off1 += overlap_len;
 		off2 += overlap_len;
 		len -= overlap_len;
