@@ -11,11 +11,16 @@
 
 typedef void (*mut_function)(Mutator*);
 
+static inline unsigned char make_printable(unsigned char c) {
+	return (c - 32) % 95 + 32;
+}
+
 static inline u64 get_random_offset(Mutator* m, int plusone) {
 
 	if (m->input_size == 0)
 		return 0;
-	return rng_exp((&m->rng), 0, m->input_size - (plusone == 0));
+
+	return rng_exp(&m->rng, 0, m->input_size - (plusone == 0));
 }
 
 static inline size_t umin(u64 x, u64 y) {
@@ -36,7 +41,9 @@ static inline size_t umin(u64 x, u64 y) {
  */
 static inline void make_space(Mutator* m, size_t offset, size_t amount) {
 
-	if (amount == 0) return;
+	if (amount == 0)
+		return;
+
 	memmove(m->input + offset + amount, m->input + offset, m->input_size - offset);
 	m->input_size += amount;
 }
@@ -50,6 +57,7 @@ static inline u64 sat_sub_u64(u64 x, u64 y) {
 /* Shift a chunk of the input to overwrite a lower block */
 static void shrink(Mutator* m) {
 	size_t offset, max_remove, remove;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
@@ -59,12 +67,12 @@ static void shrink(Mutator* m) {
 	max_remove = m->input_size - offset;
 
 	/* 15 out of 16 times we remove 16 bytes at most */
-	if (rng_rand(&(m->rng), 0, 16) != 0) {
+	if (rng_rand(rng, 0, 16) != 0) {
 		max_remove = umin(max_remove, 16);
 	}
 
 	/* Actual amount of bytes to remove */
-	remove = rng_exp(&(m->rng), 1, max_remove);
+	remove = rng_exp(rng, 1, max_remove);
 
 	/* Remove bytes */
 	memmove(m->input + offset, m->input + offset + remove, m->input_size - (offset + remove));
@@ -77,6 +85,7 @@ static void shrink(Mutator* m) {
  */
 static void expand(Mutator* m) {
 	size_t offset, max_expand, expand;
+	Rng* rng = &m->rng;
 
 	if (m->input_size >= m->max_input_size)
 		return;
@@ -86,12 +95,12 @@ static void expand(Mutator* m) {
 	max_expand = m->max_input_size - m->input_size;
 
 	/* 15 out of 16 times we expand 16 bytes at most */
-	if (rng_rand(&(m->rng), 0, 16) != 0) {
+	if (rng_rand(rng, 0, 16) != 0) {
 		max_expand = umin(max_expand, 16);
 	}
 
 	/* Actual amount to expand */
-	expand = rng_exp(&(m->rng), 1, max_expand);
+	expand = rng_exp(rng, 1, max_expand);
 
 	/* Make space and fill it */
 	make_space(m, offset, expand);
@@ -101,12 +110,13 @@ static void expand(Mutator* m) {
 /* Flip a random bit in a single byte of the input */
 static void bit(Mutator* m) {
 	size_t offset;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
 
 	offset = get_random_offset(m, 0);
-	m->input[offset] ^= (1 << rng_rand(&(m->rng), 0, 7));
+	m->input[offset] ^= (1 << rng_rand(rng, 0, 7));
 }
 
 /* Increase by 1 a random byte of the input */
@@ -145,6 +155,7 @@ static void neg_byte(Mutator* m) {
 /* Add or substract to a random offset, with a random integer size (u8 through u64) */
 static void add_sub(Mutator* m) {
 	size_t offset, remain, intsize, range, delta, tmp, i;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
@@ -153,9 +164,9 @@ static void add_sub(Mutator* m) {
 	remain = m->input_size - offset;
 
 	/* Random size of the add or subtract (1, 2, 4, or 8 bytes) */
-	if (remain >= 8) intsize = 1 << rng_rand(&(m->rng), 0, 3);
-	else if (remain >= 4) intsize = 1 << rng_rand(&(m->rng), 0, 2);
-	else if (remain >= 2) intsize = 1 << rng_rand(&(m->rng), 0, 1);
+	if (remain >= 8) intsize = 1 << rng_rand(rng, 0, 3);
+	else if (remain >= 4) intsize = 1 << rng_rand(rng, 0, 2);
+	else if (remain >= 2) intsize = 1 << rng_rand(rng, 0, 1);
 	else intsize = 1;
 
 	/* Maximum number to add or substract */
@@ -168,7 +179,7 @@ static void add_sub(Mutator* m) {
 	}
 
 	/* Convert range to random number in [-range, +range] */
-	delta = (int)(rng_rand(&(m->rng), 0, range * 2)) - (int)range;
+	delta = (int)(rng_rand(rng, 0, range * 2)) - (int)range;
 
 	/* Read bytes as int of size `intsize` */
 	memcpy(&tmp, m->input + offset, intsize);
@@ -177,10 +188,9 @@ static void add_sub(Mutator* m) {
 	tmp += delta;
 	memcpy(m->input + offset, &tmp, intsize);
 
-	/* If we're in printable mode, wrap the value modulo the printable boundaries */
 	if (m->printable) {
 		for (i = offset; i < offset + intsize; ++i) {
-			m->input[i] = (m->input[i] - 32) % 95 + 32;
+			m->input[i] = make_printable(m->input[i]);
 		}	
 	}
 }
@@ -189,17 +199,17 @@ static void add_sub(Mutator* m) {
 static void set(Mutator* m) {
 	char chr;
 	size_t offset, len;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
 
 	offset = get_random_offset(m, 0);
-	len = rng_exp(&(m->rng), 1, m->input_size - offset);
+	len = rng_exp(rng, 1, m->input_size - offset);
 
+	chr = rng_rand(rng, 0, 255);
 	if (m->printable)
-		chr = rng_rand(&(m->rng), 0, 94) + 32;
-	else
-		chr = rng_rand(&(m->rng), 0, 255);
+		chr = make_printable(chr);
 
 	memset(m->input + offset, chr, len);
 }
@@ -271,13 +281,14 @@ static void inter_splice(Mutator* m) {
 static void insert_rand(Mutator* m) {
 	char ch[2];
 	size_t offset, len, i;
+	Rng* rng = &m->rng;
 
 	if (m->printable) {
-		ch[0] = rng_rand(&(m->rng), 0, 94) + 32;
-		ch[1] = rng_rand(&(m->rng), 0, 94) + 32;
+		ch[0] = rng_rand(rng, 0, 94) + 32;
+		ch[1] = rng_rand(rng, 0, 94) + 32;
 	} else {
-		ch[0] = rng_rand(&(m->rng), 0, 255);
-		ch[1] = rng_rand(&(m->rng), 0, 255);
+		ch[0] = rng_rand(rng, 0, 255);
+		ch[1] = rng_rand(rng, 0, 255);
 	}
 
 	/* Length is random (1 or 2), and capped to max. remaining space */
@@ -288,10 +299,9 @@ static void insert_rand(Mutator* m) {
 	/* Make space for the new bytes and copy them */
 	make_space(m, offset, len);
 	for (i = offset; i < offset + len; ++i) {
+		m->input[i] = ch[i % len];
 		if (m->printable)
-			m->input[i] = ((ch[i % len]) - 32) % 95 + 32;
-		else
-			m->input[i] = ch[i % len];
+			m->input[i] = make_printable(m->input[i]);
 	}
 }
 
@@ -299,22 +309,23 @@ static void insert_rand(Mutator* m) {
 static void overwrite_rand(Mutator* m) {
 	char ch[2];
 	size_t offset, len;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
 
 	if (m->printable) {
-		ch[0] = rng_rand(&(m->rng), 0, 94) + 32;
-		ch[1] = rng_rand(&(m->rng), 0, 94) + 32;
+		ch[0] = rng_rand(rng, 0, 94) + 32;
+		ch[1] = rng_rand(rng, 0, 94) + 32;
 	} else {
-		ch[0] = rng_rand(&(m->rng), 0, 255);
-		ch[1] = rng_rand(&(m->rng), 0, 255);
+		ch[0] = rng_rand(rng, 0, 255);
+		ch[1] = rng_rand(rng, 0, 255);
 	}
 
 	/* Length is 1 or 2, and capped to max. remaining space */
 	offset = get_random_offset(m, 0);
 	len = umin(m->input_size - offset, 2);
-	len = rng_rand(&(m->rng), 1, len);
+	len = rng_rand(rng, 1, len);
 
 	memcpy(m->input + offset, ch, len);
 }
@@ -361,7 +372,7 @@ static void magic_overwrite(Mutator* m) {
 	memcpy(m->input + offset, magic->val, amount);
 	if (m->printable) {
 		for (i = offset; i < offset + amount; ++i) {
-			m->input[i] = (m->input[i] - 32) % 95 + 32;
+			m->input[i] = make_printable(m->input[i]);
 		}
 	}
 }
@@ -378,47 +389,49 @@ static void magic_insert(Mutator* m) {
 	memcpy(m->input + offset, magic->val, amount);
 	if (m->printable) {
 		for (i = offset; i < offset + amount; ++i) {
-			m->input[i] = (m->input[i] - 32) % 95 + 32;
+			m->input[i] = make_printable(m->input[i]);
 		}
 	}
 }
 
 static void random_overwrite(Mutator* m) {
 	size_t offset, amount, i;
+	Rng* rng = &m->rng;
 
 	if (m->input_size == 0)
 		return;
 
 	offset = get_random_offset(m, 0);
-	amount = rng_exp(&(m->rng), 1, m->input_size - offset);
+	amount = rng_exp(rng, 1, m->input_size - offset);
 
 	if (m->printable) {
 		for (i = offset; i < offset + amount; ++i)
-			m->input[i] = rng_rand(&(m->rng), 0, 94) + 32;
+			m->input[i] = rng_rand(rng, 0, 94) + 32;
 	} else {
 		for (i = offset; i < offset + amount; ++i)
-			m->input[i] = rng_rand(&(m->rng), 0, 255);
+			m->input[i] = rng_rand(rng, 0, 255);
 	}
 }
 
 static void random_insert(Mutator* m) {
 	size_t offset, amount, i;
+	Rng* rng = &m->rng;
 
 	offset = get_random_offset(m, 1);
-	amount = rng_exp(&(m->rng), 0, m->input_size - offset);
+	amount = rng_exp(rng, 0, m->input_size - offset);
 	amount = umin(amount, m->max_input_size - m->input_size);
 
 	make_space(m, offset, amount);
 	if (m->printable) {
 		for (i = offset; i < offset + amount; ++i)
-			m->input[i] = rng_rand(&(m->rng), 0, 94) + 32;
+			m->input[i] = rng_rand(rng, 0, 94) + 32;
 	} else {
 		for (i = offset; i < offset + amount; ++i)
-			m->input[i] = rng_rand(&(m->rng), 0, 255);
+			m->input[i] = rng_rand(rng, 0, 255);
 	}
 }
 
-const mut_function funcs[] = {
+static const mut_function funcs[] = {
 	shrink,
 	expand,
 	bit,

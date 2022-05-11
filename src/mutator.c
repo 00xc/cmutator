@@ -8,17 +8,20 @@
 int mutator_new(Mutator** self, size_t max_input_size, u64 seed, int printable) {
 	Mutator* out;
 
-	if ((out = calloc(1, sizeof(Mutator))) == NULL)
+	out = calloc(1, sizeof(Mutator));
+	if (out == NULL)
 		return 0;
 
-	if ((out->input = calloc(max_input_size, sizeof(char))) == NULL) {
+	out->input = calloc(max_input_size, sizeof(char));
+	if (out->input == NULL) {
 		mutator_free(out);
 		return 0;
 	}
 	
 	*(size_t*)&out->max_input_size = max_input_size;
 	*(int*)&out->printable = printable;
-	out->rng = (Rng) { .seed = seed, .exp_disabled = 0 };	
+	out->rng.seed = seed;
+	out->rng.exp_disabled = 0;
 
 	*self = out;
 	return 1;
@@ -35,6 +38,7 @@ int mutator_set_input(Mutator* self, void* input, size_t size) {
 
 	self->input_size = size;
 	memcpy(self->input, input, size);
+
 	return 1;
 }
 
@@ -49,10 +53,12 @@ void mutator_mutate(Mutator* self, unsigned int passes) {
 }
 
 void mutator_free(Mutator* self) {
-	if (self != NULL) {
-		if (self->input != NULL)
-			free(self->input);
-		free(self);
-		self = NULL;
-	}
+
+	if (self == NULL)
+		return;
+
+	if (self->input != NULL)
+		free(self->input);
+
+	free(self);
 }
