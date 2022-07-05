@@ -16,10 +16,10 @@ typedef struct {
 } Mutator;
 
 /*
- * Allocates a new mutator for inputs with maximum size of `max_input_size`
+ * Initializes a new mutator for inputs with maximum size of `max_input_size`
  * Returns 1 on success, 0 on failure.
  */
-int mutator_new(Mutator** self, size_t max_input_size, u64 seed, int printable);
+int mutator_init(Mutator* self, size_t max_input_size, u64 seed, int printable);
 
 /*
  * Sets a new input to mutate. `size` must be equal or smaller than the `max_input_size`
@@ -39,7 +39,7 @@ void mutator_clear_input(Mutator* self);
 void mutator_mutate(Mutator* self, unsigned int passes);
 
 /*
- * Frees the memory allocated by `mutator_new`
+ * Frees the memory allocated by `mutator_init`
  */
 void mutator_free(Mutator* self);
 

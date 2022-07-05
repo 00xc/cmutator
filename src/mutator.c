@@ -5,25 +5,17 @@
 #include "mutator.h"
 #include "strategy.h"
 
-int mutator_new(Mutator** self, size_t max_input_size, u64 seed, int printable) {
-	Mutator* out;
+int mutator_init(Mutator* self, size_t max_input_size, u64 seed, int printable) {
 
-	out = calloc(1, sizeof(Mutator));
-	if (out == NULL)
+	self->input = calloc(max_input_size, sizeof(char));
+	if (self->input == NULL)
 		return 0;
-
-	out->input = calloc(max_input_size, sizeof(char));
-	if (out->input == NULL) {
-		mutator_free(out);
-		return 0;
-	}
 	
-	*(size_t*)&out->max_input_size = max_input_size;
-	*(int*)&out->printable = printable;
-	out->rng.seed = seed;
-	out->rng.exp_disabled = 0;
+	*(size_t*)&self->max_input_size = max_input_size;
+	*(int*)&self->printable = printable;
+	self->rng.seed = seed;
+	self->rng.exp_disabled = 0;
 
-	*self = out;
 	return 1;
 }
 
@@ -59,6 +51,4 @@ void mutator_free(Mutator* self) {
 
 	if (self->input != NULL)
 		free(self->input);
-
-	free(self);
 }
