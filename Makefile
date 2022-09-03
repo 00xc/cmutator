@@ -1,4 +1,3 @@
-CC = gcc
 CFLAGS = -Wall -Wextra -Wpedantic -O3 -std=c99 -march=native
 
 MAIN = bin/main.o
