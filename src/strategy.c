@@ -33,7 +33,7 @@ static inline u64 get_random_offset(Mutator* m, int plusone) {
 	return rng_exp(&m->rng, 0, m->input_size - (plusone == 0));
 }
 
-static inline size_t umin(u64 x, u64 y) {
+static inline u64 umin(u64 x, u64 y) {
 	if (x < y) 
 		return x;
 	return y;
@@ -114,7 +114,7 @@ static void expand(Mutator* m) {
 
 	/* Make space and fill it */
 	make_space(m, offset, expand);
-	memset(m->input + offset, (m->printable) ? ' ' : '\0', expand);
+	memset(m->input + offset, m->printable ? ' ' : '\0', expand);
 }
 
 /* Flip a random bit in a single byte of the input */
@@ -383,7 +383,7 @@ static void magic_overwrite(Mutator* m) {
 		return;
 
 	offset = get_random_offset(m, 0);
-	magic = magic_values + rng_rand(&(m->rng), 0, ARR_SIZE(magic_values) - 1);
+	magic = &magic_values[rng_rand(&m->rng, 0, ARR_SIZE(magic_values) - 1)];
 	amount = umin(m->input_size - offset, magic->len);
 
 	memcpy(m->input + offset, magic->val, amount);
@@ -399,7 +399,7 @@ static void magic_insert(Mutator* m) {
 	const MagicValue* magic;
 
 	offset = get_random_offset(m, 1);
-	magic = magic_values + rng_rand(&(m->rng), 0, ARR_SIZE(magic_values) - 1);
+	magic = &magic_values[rng_rand(&m->rng, 0, ARR_SIZE(magic_values) - 1)];
 	amount = umin(m->max_input_size - m->input_size, magic->len);
 
 	make_space(m, offset, amount);
